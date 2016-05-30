@@ -372,7 +372,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	      }
 
 	      if (!query && querystring) {
-	        query = qs.parse(querystring)[this.config.depth + pathname];
+	        query = qs.parse(querystring);
 	      }
 
 	      var canonicalPath = Context.getCanonicalPath(Context.getBase(this).replace(/\/$/, ''), pathname, childPath, this.query.getFullQueryString(query, pathname), hash);
@@ -1681,18 +1681,13 @@ return /******/ (function(modules) { // webpackBootstrap
 	    var modifier = res[6]
 	    var asterisk = res[7]
 
-	    // Only use the prefix when followed by another path segment.
-	    if (prefix != null && next != null && next !== prefix) {
-	      path += prefix
-	      prefix = null
-	    }
-
 	    // Push the current path onto the tokens.
 	    if (path) {
 	      tokens.push(path)
 	      path = ''
 	    }
 
+	    var partial = prefix != null && next != null && next !== prefix
 	    var repeat = modifier === '+' || modifier === '*'
 	    var optional = modifier === '?' || modifier === '*'
 	    var delimiter = res[2] || '/'
@@ -1704,6 +1699,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	      delimiter: delimiter,
 	      optional: optional,
 	      repeat: repeat,
+	      partial: partial,
+	      asterisk: !!asterisk,
 	      pattern: escapeGroup(pattern)
 	    })
 	  }
@@ -1732,13 +1729,25 @@ return /******/ (function(modules) { // webpackBootstrap
 	}
 
 	/**
-	 * Encode characters for segment that could cause trouble for parsing.
+	 * Prettier encoding of URI path segments.
 	 *
 	 * @param  {string}
 	 * @return {string}
 	 */
 	function encodeURIComponentPretty (str) {
-	  return encodeURI(str).replace(/[/?#'"]/g, function (c) {
+	  return encodeURI(str).replace(/[\/?#]/g, function (c) {
+	    return '%' + c.charCodeAt(0).toString(16).toUpperCase()
+	  })
+	}
+
+	/**
+	 * Encode the asterisk parameter. Similar to `pretty`, but allows slashes.
+	 *
+	 * @param  {string}
+	 * @return {string}
+	 */
+	function encodeAsterisk (str) {
+	  return encodeURI(str).replace(/[?#]/g, function (c) {
 	    return '%' + c.charCodeAt(0).toString(16).toUpperCase()
 	  })
 	}
@@ -1753,7 +1762,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	  // Compile all the patterns before compilation.
 	  for (var i = 0; i < tokens.length; i++) {
 	    if (typeof tokens[i] === 'object') {
-	      matches[i] = new RegExp('^' + tokens[i].pattern + '$')
+	      matches[i] = new RegExp('^(?:' + tokens[i].pattern + ')$')
 	    }
 	  }
 
@@ -1777,6 +1786,11 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	      if (value == null) {
 	        if (token.optional) {
+	          // Prepend partial segment prefixes.
+	          if (token.partial) {
+	            path += token.prefix
+	          }
+
 	          continue
 	        } else {
 	          throw new TypeError('Expected "' + token.name + '" to be defined')
@@ -1785,7 +1799,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
 	      if (isarray(value)) {
 	        if (!token.repeat) {
-	          throw new TypeError('Expected "' + token.name + '" to not repeat, but received "' + value + '"')
+	          throw new TypeError('Expected "' + token.name + '" to not repeat, but received `' + JSON.stringify(value) + '`')
 	        }
 
 	        if (value.length === 0) {
@@ -1800,7 +1814,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	          segment = encode(value[j])
 
 	          if (!matches[i].test(segment)) {
-	            throw new TypeError('Expected all "' + token.name + '" to match "' + token.pattern + '", but received "' + segment + '"')
+	            throw new TypeError('Expected all "' + token.name + '" to match "' + token.pattern + '", but received `' + JSON.stringify(segment) + '`')
 	          }
 
 	          path += (j === 0 ? token.prefix : token.delimiter) + segment
@@ -1809,7 +1823,7 @@ return /******/ (function(modules) { // webpackBootstrap
 	        continue
 	      }
 
-	      segment = encode(value)
+	      segment = token.asterisk ? encodeAsterisk(value) : encode(value)
 
 	      if (!matches[i].test(segment)) {
 	        throw new TypeError('Expected "' + token.name + '" to match "' + token.pattern + '", but received "' + segment + '"')
@@ -1883,6 +1897,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	        delimiter: null,
 	        optional: false,
 	        repeat: false,
+	        partial: false,
+	        asterisk: false,
 	        pattern: null
 	      })
 	    }
@@ -1957,17 +1973,17 @@ return /******/ (function(modules) { // webpackBootstrap
 	      route += escapeString(token)
 	    } else {
 	      var prefix = escapeString(token.prefix)
-	      var capture = token.pattern
+	      var capture = '(?:' + token.pattern + ')'
 
 	      if (token.repeat) {
 	        capture += '(?:' + prefix + capture + ')*'
 	      }
 
 	      if (token.optional) {
-	        if (prefix) {
+	        if (!token.partial) {
 	          capture = '(?:' + prefix + '(' + capture + '))?'
 	        } else {
-	          capture = '(' + capture + ')?'
+	          capture = prefix + '(' + capture + ')?'
 	        }
 	      } else {
 	        capture = prefix + '(' + capture + ')'
