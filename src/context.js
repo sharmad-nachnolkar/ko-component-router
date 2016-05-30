@@ -85,7 +85,7 @@ class Context {
     }
 
     if (!query && querystring) {
-      query = qs.parse(querystring)[this.config.depth + pathname]
+      query = qs.parse(querystring)
     }
 
     const canonicalPath = Context
