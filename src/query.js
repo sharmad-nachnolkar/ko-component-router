@@ -179,6 +179,7 @@ class Query {
 
   getFullQueryString(query, pathname) {
     return qs.stringify(this.getNonDefaultParams(query, pathname))
+    //return qs.stringify(this.getNonDefaultParams(query, pathname))
   }
 }
 
