@@ -76,7 +76,7 @@ class Query {
       ? ko.pureComputed({
           read() {
             trigger()
-            return this.getAll()
+            return this.getNonDefaultParamsl()
           },
           write(q) {
             for (const pn in q) {
@@ -178,7 +178,7 @@ class Query {
   }
 
   getFullQueryString(query, pathname) {
-    return qs.stringify(this.getNonDefaultParams(query, pathname))
+    return qs.stringify(query)
     //return qs.stringify(this.getNonDefaultParams(query, pathname))
   }
 }
